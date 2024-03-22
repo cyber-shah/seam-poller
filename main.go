@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +30,7 @@ TODO:		error handling
 				logging
 				Multiple polling jobs running concurrently
 				Instructions of how to run and test the service
+
 */
 
 /*
@@ -39,40 +39,31 @@ Two microservices :
 1. Requests that handles our first line of APIs and database -- the user works with.
 2. Poller that actually polls the requested service.
 
+# A message queue that sits in between both the services
+
 Why ?
 Allows higher scalability and performance as the Poller might need to scale horizontally
 while requests might not.
+More Pollers can be added if the queue gets filled up quickly
 */
 type PollingRequest struct {
-	userId          string
-	apiEndpoint     url.URL
-	pollingInterval time.Timer
+	UserId          string
+	ApiEndpoint     string
+	PollingInterval time.Duration
 }
 
-// album represents data about a record album.
-type album struct {
-	ID     string  `json:"id"`
-	Title  string  `json:"title"`
-	Artist string  `json:"artist"`
-	Price  float64 `json:"price"`
-}
-
-// albums slice to seed record album data.
-var albums = []album{
-	{ID: "1", Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
-	{ID: "2", Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
-	{ID: "3", Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
+var PollingRequests = []PollingRequest{
+	{UserId: "meh", ApiEndpoint: "http://hellowowrld.com", PollingInterval: time.Second * 10},
 }
 
 // getAlbums responds with the list of all albums as JSON.
-func getAlbums(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, albums)
+func getRequests(c *gin.Context) {
+	c.JSON(http.StatusOK, PollingRequests)
 }
 
 func main() {
 	fmt.Println("hello world")
 	router := gin.Default()
-	router.GET("/albums", getAlbums)
-
+	router.GET("/get", getRequests)
 	router.Run("localhost:8080")
 }

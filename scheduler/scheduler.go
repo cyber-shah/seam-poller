@@ -27,17 +27,12 @@ func main() {
 	// Connect to RabbitMQ server
 	conn, err := amqp.Dial(rabbitMQURL)
 	helpers.LogError(err, "")
-	defer conn.Close()
 
 	// Create a channel
-	ch, err := conn.Channel()
-	if err != nil {
-		log.Fatalf("Failed to open a channel: %v", err)
-	}
-	defer ch.Close()
+	channel, pollerQueue := helpers.SetupQueue(conn, pollerQueueName)
 
 	// Consume messages from the scheduler queue
-	go consumeSchedulerQueue(ch)
+	go consumeSchedulerQueue(channel)
 
 	log.Println("Scheduler service started. Waiting for messages...")
 	// Block the main goroutine

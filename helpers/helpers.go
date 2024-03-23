@@ -6,6 +6,12 @@ import (
 	"github.com/streadway/amqp"
 )
 
+const (
+	SchedulerQueueName = "schedulerQueue"
+	PollerQueueName    = "pollerQueue"
+	RabbitMQURL        = "amqp://guest:guest@localhost:5672/"
+)
+
 func LogError(err error, message string) {
 	if err != nil {
 		log.Fatalf("%s: %s", err, message)
@@ -30,15 +36,8 @@ func Publish(channel *amqp.Channel, queue *amqp.Queue, body []byte) {
 		})
 }
 
-/*
-Sets up the connection and returns channel and queue
-*/
-func SetupQueue(connection *amqp.Connection, queueName string) (*amqp.Channel, *amqp.Queue) {
-	// 2. create a channel
-	channel, err := connection.Channel()
-	LogError(err, "")
-
-	// 3. create a queue
+// queue setup to remain modular
+func SetupQ(channel *amqp.Channel, queueName string) *amqp.Queue {
 	queue, err := channel.QueueDeclare(
 		queueName, // name
 		true,      // persistant
@@ -48,5 +47,5 @@ func SetupQueue(connection *amqp.Connection, queueName string) (*amqp.Channel, *
 		nil)
 	LogError(err, "")
 
-	return channel, &queue
+	return &queue
 }

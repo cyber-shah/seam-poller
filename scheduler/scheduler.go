@@ -1,8 +1,7 @@
-package scheduler
+package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"time"
 
@@ -11,67 +10,40 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type PollingRequest struct {
-	UserID          string `json:"userId"`
-	APIEndpoint     string `json:"apiEndpoint"`
-	PollingInterval int    `json:"pollingInterval"`
-}
-
-const (
-	schedulerQueueName = "schedulerQueue"
-	pollerQueueName    = "pollerQueue"
-	rabbitMQURL        = "amqp://guest:guest@localhost:5672/"
-)
-
 func main() {
 	// Connect to RabbitMQ server
-	conn, err := amqp.Dial(rabbitMQURL)
+	conn, err := amqp.Dial(helpers.RabbitMQURL)
 	helpers.LogError(err, "")
 
 	// Create a channel
-	channel, pollerQueue := helpers.SetupQueue(conn, pollerQueueName)
+	channel, _ := conn.Channel()
+	schedulerQueue := helpers.SetupQ(channel, helpers.SchedulerQueueName)
 
 	// Consume messages from the scheduler queue
-	go consumeSchedulerQueue(channel)
+	go consumeSchedulerQueue(channel, schedulerQueue)
 
 	log.Println("Scheduler service started. Waiting for messages...")
 	// Block the main goroutine
 	select {}
 }
 
+// -----------------------------------------------------------------------------------------------
 // Function to consume messages from the scheduler queue
-func consumeSchedulerQueue(ch *amqp.Channel) {
-	// Declare the scheduler queue
-	q, err := ch.QueueDeclare(
-		schedulerQueueName, // name
-		true,               // durable
-		false,              // delete when unused
-		false,              // exclusive
-		false,              // no-wait
-		nil,                // arguments
-	)
-	if err != nil {
-		log.Fatalf("Failed to declare a queue: %v", err)
-	}
-
+// -----------------------------------------------------------------------------------------------
+func consumeSchedulerQueue(ch *amqp.Channel, schedulerQueue *amqp.Queue) {
 	// Consume messages from the scheduler queue
-	msgs, err := ch.Consume(
-		q.Name, // queue
-		"",     // consumer
-		true,   // auto-ack
-		false,  // exclusive
-		false,  // no-local
-		false,  // no-wait
-		nil,    // args
+	msgs, _ := ch.Consume(
+		schedulerQueue.Name, // queue
+		"",                  // consumer
+		true,                // auto-ack
+		false,               // exclusive
+		false,               // no-local
+		false,               // no-wait
+		nil,                 // args
 	)
-	if err != nil {
-		log.Fatalf("Failed to register a consumer: %v", err)
-	}
-
 	// Process incoming messages
 	for msg := range msgs {
-		fmt.Println("Received a message:", string(msg.Body))
-
+		log.Println("Received a message:", string(msg.Body))
 		// Spawn a goroutine to publish messages to the poller queue
 		go publishPollerQueue(ch, msg.Body)
 	}
@@ -93,39 +65,23 @@ func publishPollerQueue(ch *amqp.Channel, body []byte) {
 		log.Println("PollingInterval not found or not a valid number")
 		return
 	}
-	fmt.Println(pollingInterval)
 
-	// Declare the poller queue
-	q, err := ch.QueueDeclare(
-		pollerQueueName, // name
-		false,           // durable
-		false,           // delete when unused
-		false,           // exclusive
-		false,           // no-wait
-		nil,             // arguments
-	)
-	if err != nil {
-		log.Printf("Failed to declare a queue: %v", err)
-		return
-	}
+	q := helpers.SetupQ(ch, helpers.PollerQueueName)
 
 	// Publish messages to the poller queue at regular intervals
 	ticker := time.NewTicker(time.Duration(pollingInterval) * time.Millisecond)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		err := ch.Publish(
-			"",     // exchange
-			q.Name, // routing key
-			false,  // mandatory
-			false,  // immediate
+		ch.Publish(
+			"",
+			q.Name,
+			false,
+			false,
 			amqp.Publishing{
 				ContentType: "text/plain",
 				Body:        body,
 			},
 		)
-		if err != nil {
-			log.Printf("Failed to publish message: %v", err)
-		}
 	}
 }

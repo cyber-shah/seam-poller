@@ -14,7 +14,8 @@ func main() {
 	// 1. connect to rabbitmq and log any errors
 	connection, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	helpers.LogError(err, "")
-	channel, queue := helpers.SetupQueue(connection, "schedulerQueue")
+	channel, _ := connection.Channel()
+	queue := helpers.SetupQ(channel, "schedulerQueue")
 
 	// 2. start the server and create the endpoints
 	router := gin.Default()

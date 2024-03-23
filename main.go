@@ -1,59 +1,19 @@
 package main
 
 import (
-	// "fmt"
+	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
-	"time"
 
 	"github.com/streadway/amqp"
 
 	"github.com/gin-gonic/gin"
 )
 
-/**
-	1. User specifizac polling - diff jobs for diff users
-	2. Polling job creation - accept the job API and interval
-	3. Poll the API at interval, interval is specified and must be configurable
-	4. Store response from the third party -- inside a Database
-	5. Duplicate data handling - agnostic of DS & content sent by 3rd party
-	6. Persistence of jobs
-
-	Example request:
-	```json
-	POST /polling-jobs
-	{
-	"userId": "user123",
-	"apiEndpoint": "docs.dummyapi.online/api/endpoint",
-	"pollingInterval": 60000
-	}
-```
-
-TODO:		error handling
-				logging
-				Multiple polling jobs running concurrently
-				Instructions of how to run and test the service
-
-*/
-
-/*
-	Design:
-	Two microservices :
-	1. Requests that handles our first line of APIs and database -- the user works with.
-	2. Poller that actually polls the requested service.
-	# A message queue that sits in between both the services
-	#
-	Why ?
-	Allows higher scalability and performance as the Poller might need to scale horizontally
-	while requests might not.
-	More Pollers can be added if the queue gets filled up quickly
-*/
-
 type PollingRequest struct {
-	UserId          string
-	ApiEndpoint     string
-	PollingInterval time.Duration
+	UserID          string `json:"userId"`
+	APIEndpoint     string `json:"apiEndpoint"`
+	PollingInterval int    `json:"pollingInterval"`
 }
 
 func logError(err error, message string) {
@@ -70,11 +30,8 @@ func main() {
 
 	// 2. start the server and create the endpoints
 	router := gin.Default()
-	router.Handle("POST", "/create", func(c *gin.Context) {
+	router.Handle("POST", "/polling-jobs", func(c *gin.Context) {
 		create(c, channel, queue)
-	})
-	router.Handle("GET", "/read", func(c *gin.Context) {
-		read(c, channel, queue)
 	})
 	router.Run("localhost:8080")
 }
@@ -89,8 +46,8 @@ func setupQueue(connection *amqp.Connection) (*amqp.Channel, *amqp.Queue) {
 
 	// 3. create a queue
 	queue, err := channel.QueueDeclare(
-		"apiQueue", // name
-		true,       // persistant
+		"schedulerQueue", // name
+		true,             // persistant
 		false,
 		false,
 		false,
@@ -100,29 +57,39 @@ func setupQueue(connection *amqp.Connection) (*amqp.Channel, *amqp.Queue) {
 	return channel, &queue
 }
 
-func create(connection *gin.Context, channel *amqp.Channel, queue *amqp.Queue) {
-	// create a struct
-	var requestBody struct {
-		UserID          string `json:"userId"`
-		APIEndpoint     string `json:"apiEndpoint"`
-		PollingInterval int    `json:"pollingInterval"`
+func create(c *gin.Context, channel *amqp.Channel, queue *amqp.Queue) {
+	// Create a struct
+	var requestBody PollingRequest
+
+	// Parse request body to struct
+	if err := c.ShouldBind(&requestBody); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
 	}
 
-	// parse json to struct
-	connection.ShouldBindJSON(&requestBody)
+	// Marshal the struct to JSON
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to marshal JSON"})
+		return
+	}
 
-	messageBody := fmt.Sprintf("userId : %s, APIEndpoint: %s, PollingInterval: %d",
-		requestBody.UserID,
-		requestBody.APIEndpoint,
-		requestBody.PollingInterval)
-
-	channel.Publish(
+	// Publish the JSON message to the queue
+	err = channel.Publish(
 		"",
 		queue.Name,
 		true,
 		false,
 		amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        []byte(messageBody),
+			ContentType: "application/json", // Set content type to JSON
+			Body:        jsonBody,           // Use the JSON-encoded message body
 		})
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to publish message to queue"})
+		return
+	}
+	fmt.Println(jsonBody)
+
+	// Send a success message
+	c.JSON(200, gin.H{"success": "Polling job created successfully"})
 }

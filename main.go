@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
+
+	"github.com/streadway/amqp"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,6 +49,9 @@ Allows higher scalability and performance as the Poller might need to scale hori
 while requests might not.
 More Pollers can be added if the queue gets filled up quickly
 */
+
+var rabbitMQConn *amqp.Connection
+
 type PollingRequest struct {
 	UserId          string
 	ApiEndpoint     string
@@ -61,8 +67,13 @@ func getRequests(c *gin.Context) {
 	c.JSON(http.StatusOK, PollingRequests)
 }
 
+func postRequests(c *gin.Context) {
+	PollingRequests = append(PollingRequests)
+}
+
 func main() {
 	fmt.Println("hello world")
+	rabbitMQConn = amqp.Dial("amqp://guest:guest@localhost:5672/")
 	router := gin.Default()
 	router.GET("/get", getRequests)
 	router.Run("localhost:8080")

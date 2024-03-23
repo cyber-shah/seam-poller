@@ -1,10 +1,12 @@
-package main
+package scheduler
 
 import (
 	"encoding/json"
 	"fmt"
 	"log"
 	"time"
+
+	"polling_service/helpers"
 
 	"github.com/streadway/amqp"
 )
@@ -24,9 +26,7 @@ const (
 func main() {
 	// Connect to RabbitMQ server
 	conn, err := amqp.Dial(rabbitMQURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
+	helpers.LogError(err, "")
 	defer conn.Close()
 
 	// Create a channel

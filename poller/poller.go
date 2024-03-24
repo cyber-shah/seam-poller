@@ -1,4 +1,4 @@
-package main
+package poller
 
 // TODO: logging everywhere
 
@@ -17,7 +17,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func main() {
+func Init() {
 	// Connect to RabbitMQ server
 	conn, _ := amqp.Dial(helpers.RabbitMQURL)
 	// Create a channel

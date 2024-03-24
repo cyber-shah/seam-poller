@@ -1,4 +1,4 @@
-package main
+package scheduler
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func main() {
+func Init() {
 	// Connect to RabbitMQ server
 	conn, err := amqp.Dial(helpers.RabbitMQURL)
 	helpers.LogError(err, "")
@@ -56,7 +56,6 @@ func publishPollerQueue(ch *amqp.Channel, body []byte) {
 	// Parse the message body as JSON
 	var data map[string]interface{}
 	err := json.Unmarshal(body, &data)
-	log.Printf(string(body))
 	helpers.LogError(err, "Failed to unmarshal message")
 
 	// Extract polling interval from the JSON data
@@ -68,12 +67,14 @@ func publishPollerQueue(ch *amqp.Channel, body []byte) {
 
 	q := helpers.SetupQ(ch, helpers.PollerQueueName)
 
-	// Publish messages to the poller queue at regular intervals
-	ticker := time.NewTicker(time.Duration(pollingInterval) * time.Millisecond)
-	defer ticker.Stop()
+	if pollingInterval > 0 {
+		// Publish messages to the poller queue at regular intervals
+		ticker := time.NewTicker(time.Duration(pollingInterval) * time.Millisecond)
+		defer ticker.Stop()
 
-	// at each time interval, publish to the queue
-	for range ticker.C {
-		helpers.Publish(ch, q, body)
+		// at each time interval, publish to the queue
+		for range ticker.C {
+			helpers.Publish(ch, q, body)
+		}
 	}
 }

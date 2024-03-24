@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-
 	"polling_service/helpers"
 
 	"github.com/streadway/amqp"
@@ -10,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// TODO: storing the active polling jobs in a persistent storage mechanism
 func main() {
 	// 1. connect to rabbitmq and log any errors
 	connection, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
@@ -25,22 +24,11 @@ func main() {
 	router.Run("localhost:8080")
 }
 
+// -----------------------------------------------------------------------------------------------
+// API ENDPOINT POST /POLLING-JOBS
+// -----------------------------------------------------------------------------------------------
 func create(c *gin.Context, channel *amqp.Channel, queue *amqp.Queue) {
-	// Create a struct
-	var requestBody helpers.PollingRequest
-
-	// Parse request body to struct
-	if err := c.ShouldBind(&requestBody); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Marshal the struct to JSON
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		c.JSON(500, gin.H{"error": "Failed to marshal JSON"})
-		return
-	}
+	jsonBody := helpers.ConvertToJson(c)
 
 	// Publish the JSON message to the queue
 	helpers.Publish(channel, queue, jsonBody)

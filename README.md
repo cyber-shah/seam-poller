@@ -1,5 +1,4 @@
-
-// all microservices are in go and therefore its better to use structs instead of json for inner communication
+// hash used to stop  duplication
 
 /**
 	1. User specifizac polling - diff jobs for diff users

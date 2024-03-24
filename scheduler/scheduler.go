@@ -28,7 +28,7 @@ func main() {
 }
 
 // -----------------------------------------------------------------------------------------------
-// Function to consume messages from the scheduler queue
+// CONSUME FROM THE SCHEDULER
 // -----------------------------------------------------------------------------------------------
 func consumeSchedulerQueue(ch *amqp.Channel, schedulerQueue *amqp.Queue) {
 	// Consume messages from the scheduler queue
@@ -49,7 +49,9 @@ func consumeSchedulerQueue(ch *amqp.Channel, schedulerQueue *amqp.Queue) {
 	}
 }
 
-// Function to publish message to the poller queue
+// -----------------------------------------------------------------------------------------------
+// PUBLISH TO THE POLLER
+// -----------------------------------------------------------------------------------------------
 func publishPollerQueue(ch *amqp.Channel, body []byte) {
 	// Parse the message body as JSON
 	var data map[string]interface{}
@@ -72,16 +74,8 @@ func publishPollerQueue(ch *amqp.Channel, body []byte) {
 	ticker := time.NewTicker(time.Duration(pollingInterval) * time.Millisecond)
 	defer ticker.Stop()
 
+	// at each time interval, publish to the queue
 	for range ticker.C {
-		ch.Publish(
-			"",
-			q.Name,
-			false,
-			false,
-			amqp.Publishing{
-				ContentType: "text/plain",
-				Body:        body,
-			},
-		)
+		helpers.Publish(ch, q, body)
 	}
 }

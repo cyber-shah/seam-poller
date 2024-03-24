@@ -1,6 +1,8 @@
 
 # Main Features
 
+Uses Go, RabbitMQ and PostgreSQL
+
 1. **User-Specific Polling Jobs:** Each user can have their own unique polling jobs, so they can get data tailored to their needs.
 
 2. **Create Polling Jobs:** Users can create new polling jobs by providing the API endpoint and the interval at which they want the data to be fetched.
@@ -55,6 +57,8 @@ To make this polling service scalable and efficient, I went with a microservices
 
 # Getting Started
 
+All the dependencies can be found inside dependencies.txt.
+
 To run this project:
 
 1. Clone this repository to your local machine.
@@ -63,6 +67,6 @@ To run this project:
 4. Build and run the project using the following commands:
 
 ```bash
-go build
-./polling-service
+go build .
+./polling_service
 

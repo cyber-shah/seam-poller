@@ -74,6 +74,7 @@ func checkPrevious(db *sql.DB, channel *amqp.Channel, queue *amqp.Queue) {
 	for _, job := range activeJobs {
 		jsonBody, err := json.Marshal(job)
 		helpers.LogError(err, "can't convert to json")
+		log.Printf("INITIATOR: ")
 		log.Printf("sending from checkprevious %s", jsonBody)
 		helpers.Publish(channel, queue, jsonBody)
 	}

@@ -22,6 +22,7 @@ func Init() {
 	// Consume messages from the scheduler queue
 	go consumeSchedulerQueue(channel, schedulerQueue)
 
+	log.Printf("SCHEDULER: ")
 	log.Println("Scheduler service started. Waiting for messages...")
 	// Block the main goroutine
 	select {}
@@ -43,6 +44,7 @@ func consumeSchedulerQueue(ch *amqp.Channel, schedulerQueue *amqp.Queue) {
 	)
 	// Process incoming messages
 	for msg := range msgs {
+		log.Printf("SCHEDULER: ")
 		log.Println("Received a message:", string(msg.Body))
 		// Spawn a goroutine to publish messages to the poller queue
 		go publishPollerQueue(ch, msg.Body)

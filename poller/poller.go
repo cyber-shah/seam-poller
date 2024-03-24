@@ -71,6 +71,7 @@ func processMessage(msg []byte, db *sql.DB) []byte {
 	err = db.QueryRow("SELECT COUNT(*) FROM api_responses WHERE hash = $1", hashValue).Scan(&count)
 	helpers.LogError(err, "failed to query database")
 	if count > 0 {
+		log.Printf("POLLER: ")
 		log.Println("Duplicate data detected, skipping insertion")
 		return body
 	}
@@ -83,6 +84,7 @@ func processMessage(msg []byte, db *sql.DB) []byte {
 	_, err = statement.Exec(requestBody.UserID, string(body), hashValue)
 	helpers.LogError(err, "unable to execute SQL statement")
 
+	log.Printf("POLLER: ")
 	log.Println("Response data inserted into the database")
 
 	return body

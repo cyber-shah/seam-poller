@@ -3,12 +3,10 @@ package main
 // TODO: logging everywhere
 
 import (
-	// "log"
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -19,22 +17,13 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// TODO: is there a better way to do this??
-const (
-	host     = "localhost"
-	port     = 5432
-	user     = "myuser"
-	password = "mypassword"
-	dbname   = "mydatabase"
-)
-
 func main() {
 	// Connect to RabbitMQ server
 	conn, _ := amqp.Dial(helpers.RabbitMQURL)
 	// Create a channel
 	ch, _ := conn.Channel()
 
-	db := connectToDB()
+	db := helpers.ConnectToDB()
 
 	// Consume messages from the poller queue
 	consumePollerQueue(ch, db)
@@ -53,6 +42,12 @@ func consumePollerQueue(ch *amqp.Channel, db *sql.DB) {
 	}
 }
 
+// =======================================================================================
+// 1. PARSES THE MESSAGE
+// 2. CALLS THE API
+// 3. CHECKS DUPLICATES
+// 4. ADDS TO DB
+// =======================================================================================
 func processMessage(msg []byte, db *sql.DB) []byte {
 	var requestBody helpers.PollingRequest
 
@@ -76,38 +71,19 @@ func processMessage(msg []byte, db *sql.DB) []byte {
 	err = db.QueryRow("SELECT COUNT(*) FROM api_responses WHERE hash = $1", hashValue).Scan(&count)
 	helpers.LogError(err, "failed to query database")
 	if count > 0 {
-		fmt.Println("Duplicate data detected, skipping insertion")
+		log.Println("Duplicate data detected, skipping insertion")
 		return body
 	}
 
-	statement, err := db.Prepare("INSERT INTO api_responses (user_id, response_body) VALUES ($1, $2)")
-	// _, err = statement.Exec(userID, body)
-	helpers.LogError(err, "unable to execute statement")
+	// Prepare SQL statement
+	statement, err := db.Prepare("INSERT INTO api_responses (user_id, response_body, hash) VALUES ($1, $2, $3)")
+	helpers.LogError(err, "unable to prepare SQL statement")
+
+	// Execute SQL statement
+	_, err = statement.Exec(requestBody.UserID, string(body), hashValue)
+	helpers.LogError(err, "unable to execute SQL statement")
+
+	log.Println("Response data inserted into the database")
 
 	return body
-}
-
-func connectToDB() *sql.DB {
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-
-	db, err := sql.Open("postgres", connStr)
-	helpers.LogError(err, "cant open postgres")
-
-	err = db.Ping()
-	helpers.LogError(err, "cant open postgres")
-
-	log.Printf("Connected to DB")
-
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS api_responses (
-		id SERIAL PRIMARY KEY,
-		user_id TEXT NOT NULL,
-		requested_endpoint TEXT NOT NULL,
-		response_body TEXT NOT NULL,
-		hash TEXT NOT NULL,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	)`)
-	helpers.LogError(err, "can't create table")
-
-	return db
 }

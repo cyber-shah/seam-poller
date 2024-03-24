@@ -26,7 +26,6 @@ const (
 //	POSTGRE SQL CONSTS
 //
 // ---------------------------------------------------------------------------------
-// TODO: is there a better way to do this??
 const (
 	host     = "localhost"
 	port     = 5432

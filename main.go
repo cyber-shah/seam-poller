@@ -3,12 +3,15 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 
 	"polling_service/helpers"
 
 	"github.com/streadway/amqp"
 
 	"github.com/gin-gonic/gin"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -35,10 +38,6 @@ func main() {
 // API ENDPOINT POST /POLLING-JOBS
 // -----------------------------------------------------------------------------------------------
 func create(c *gin.Context, channel *amqp.Channel, queue *amqp.Queue, db *sql.DB) {
-	// add to DB
-	_, err := db.Exec(`INSERT INTO apis_created (user_id, requested_endpoint, polling_interval) 
-VALUES ($1, $2, $3)`, job.UserID, job.APIEndpoint, job.PollingInterval)
-
 	jsonBody := helpers.ConvertToJson(c)
 
 	// Publish the JSON message to the queue
@@ -46,10 +45,17 @@ VALUES ($1, $2, $3)`, job.UserID, job.APIEndpoint, job.PollingInterval)
 
 	// Send a success message
 	c.JSON(200, gin.H{"success": "Polling job created successfully"})
+
+	// add to DB
+	var job helpers.PollingRequest
+	c.BindJSON(&job)
+	_, err := db.Exec(`INSERT INTO apis_created (user_id, requested_endpoint, polling_interval) 
+VALUES ($1, $2, $3)`, job.UserID, job.APIEndpoint, job.PollingInterval)
+	helpers.LogError(err, "unable to add it to db")
 }
 
 func checkPrevious(db *sql.DB, channel *amqp.Channel, queue *amqp.Queue) {
-	rows, err := db.Query("SELECT COUNT(*) FROM apis_created")
+	rows, err := db.Query("SELECT user_id, requested_endpoint, polling_interval FROM apis_created")
 	helpers.LogError(err, "failed to retrieve existing jobs from database")
 
 	var activeJobs []helpers.PollingRequest
@@ -62,11 +68,13 @@ func checkPrevious(db *sql.DB, channel *amqp.Channel, queue *amqp.Queue) {
 			APIEndpoint:     apiEndpoint,
 			PollingInterval: pollingInterval,
 		})
+
 	}
 
-	for job := range activeJobs {
+	for _, job := range activeJobs {
 		jsonBody, err := json.Marshal(job)
 		helpers.LogError(err, "can't convert to json")
+		log.Printf("sending from checkprevious %s", jsonBody)
 		helpers.Publish(channel, queue, jsonBody)
 	}
 }

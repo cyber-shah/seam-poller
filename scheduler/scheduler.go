@@ -56,10 +56,8 @@ func publishPollerQueue(ch *amqp.Channel, body []byte) {
 	// Parse the message body as JSON
 	var data map[string]interface{}
 	err := json.Unmarshal(body, &data)
-	if err != nil {
-		log.Printf("Failed to unmarshal message: %v", err)
-		return
-	}
+	log.Printf(string(body))
+	helpers.LogError(err, "Failed to unmarshal message")
 
 	// Extract polling interval from the JSON data
 	pollingInterval, ok := data["pollingInterval"].(float64)
